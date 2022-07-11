@@ -1,6 +1,6 @@
 import React from "react";
 
-import NminSite from "./assets/artifacts/NminSite.json";
+import NminSite from "./assets/contracts/NminSite.json";
 
 export interface AppContextProps {
   // contractData: any;
@@ -14,11 +14,7 @@ interface AppProviderProps {
 }
 
 const AppProvider = ({ children }: AppProviderProps) => {
-  const init = async () => {};
-
-  React.useEffect(() => {
-    //     init();
-  }, []);
+  React.useEffect(() => {}, []);
 
   return (
     <AppContext.Provider

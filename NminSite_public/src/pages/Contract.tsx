@@ -4,7 +4,7 @@ import { useMoralis, useWeb3Contract } from "react-moralis";
 import { AppContext } from "../AppContext";
 import Swal from "sweetalert2";
 
-import NFToken from "../assets/artifacts/NFToken.json";
+import NFToken from "../assets/contracts/NFToken.json";
 
 import { useParams } from "react-router-dom";
 

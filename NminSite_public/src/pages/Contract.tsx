@@ -1,8 +1,8 @@
 import React from "react";
 import { Button, Box, Flex, Text, Image, Link, Spacer, Textarea } from "@chakra-ui/react";
-import { useMoralis, useWeb3Contract } from "react-moralis";
 import { AppContext } from "../AppContext";
 import Swal from "sweetalert2";
+import { ethers } from "ethers";
 
 import NFToken from "../assets/contracts/NFToken.json";
 
@@ -27,11 +27,11 @@ interface NFT {
 export default function Contract() {
   const appCtx = React.useContext(AppContext);
 
-  const { isAuthenticated, enableWeb3 } = useMoralis();
-
   const [setting, setSetting] = React.useState<website>();
   const [nft, setNft] = React.useState<NFT>();
   const [bg, setBG] = React.useState<string>("");
+
+  const [NFTcontract, setNFTcontract] = React.useState<ethers.Contract>();
 
   const { tokenId } = useParams();
 
@@ -39,76 +39,48 @@ export default function Contract() {
     return <>404</>;
   }
 
-  const { data, error, runContractFunction, isFetching, isLoading } = useWeb3Contract({
-    abi: appCtx.contractABI,
-    contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
-    functionName: "websites",
-    params: { "": +tokenId },
-  });
-
   const mint = async () => {
-    runContractFunction({
-      params: {
-        abi: NFToken.abi,
-        contractAddress: setting?.addr,
-        functionName: "mint",
-      },
-      onSuccess: async (tx: any) => {
-        const response = await tx.wait();
+    if (appCtx.signer) {
+      const tx = await NFTcontract?.connect(appCtx.signer).mint();
+      const response = await tx.wait();
 
-        const { events } = response;
-        events.map((event: any) => {
-          if (event.event === "Transfer") {
-            const { tokenId } = event.args;
-            Swal.fire("Mint Success", "you get token " + tokenId, "success");
-          }
-        });
-      },
-      onError: async (err: any) => {
-        console.log(err.message);
-      },
-    });
+      const { events } = response;
+      events.map((event: any) => {
+        if (event.event === "Transfer") {
+          const { tokenId } = event.args;
+          Swal.fire("Mint Success", "you get token " + tokenId, "success");
+        }
+      });
+    }
   };
 
   const init = async () => {
-    await enableWeb3();
+    try {
+      if (appCtx.contract && appCtx.signer && appCtx.provider) {
+        const response = await appCtx.contract.connect(appCtx.signer).websites(+tokenId);
+        console.log(response);
 
-    runContractFunction({
-      onSuccess: async (response: any) => {
         const { addr, content, coverURL, title } = response;
 
         setSetting({ addr, content, coverURL, title });
         setBG(`url("${coverURL}")`);
 
-        runContractFunction({
-          params: {
-            abi: NFToken.abi,
-            contractAddress: addr,
-            functionName: "name",
-          },
-          onSuccess: async (name: any) => {
-            runContractFunction({
-              params: {
-                abi: NFToken.abi,
-                contractAddress: addr,
-                functionName: "symbol",
-              },
-              onSuccess: async (symbol: any) => {
-                setNft({ name, symbol });
-              },
-            });
-          },
-        });
-      },
-      onError: async (err: any) => {
-        console.log(err.message);
-      },
-    });
+        const NFTcontract = new ethers.Contract(addr, NFToken.abi, appCtx.provider);
+        setNFTcontract(NFTcontract);
+
+        const name = await NFTcontract.connect(appCtx.signer).name();
+
+        const symbol = await NFTcontract.connect(appCtx.signer).symbol();
+        setNft({ name, symbol });
+      }
+    } catch (error: any) {
+      console.log(error.message);
+    }
   };
 
   React.useEffect(() => {
     init();
-  }, []);
+  }, [appCtx.contract]);
 
   return (
     <>
@@ -136,8 +108,8 @@ export default function Contract() {
             <Box margin="0 15px">Team</Box>
             <Spacer />
 
-            {isAuthenticated ? (
-              <Box margin="0 15px"> Connected</Box>
+            {appCtx.contract ? (
+              <Box margin="0 15px">Connected</Box>
             ) : (
               <Button
                 backgroundColor="#D6517D"
@@ -148,7 +120,9 @@ export default function Contract() {
                 fontFamily="inherit"
                 padding="15px"
                 margin="0 15px"
-                onClick={() => {}}
+                onClick={() => {
+                  appCtx.connect();
+                }}
               >
                 Connect
               </Button>
@@ -174,7 +148,7 @@ export default function Contract() {
               />
             </div>
           </Box>
-          {isAuthenticated ? (
+          {appCtx.contract ? (
             <Flex>
               <Button
                 backgroundColor="#D6517D"

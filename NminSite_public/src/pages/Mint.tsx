@@ -11,9 +11,11 @@ import {
   Textarea,
   Spinner,
 } from "@chakra-ui/react";
-import { useMoralis, useWeb3Contract } from "react-moralis";
 import { AppContext } from "../AppContext";
 import { useFormik } from "formik";
+import { ethers } from "ethers";
+
+import NminSite from "../assets/contracts/NminSite.json";
 
 import Facebook from "../assets/social-media-icons/facebook_32x32.png";
 import Twitter from "../assets/social-media-icons/twitter_32x32.png";
@@ -27,38 +29,31 @@ interface result {
 export default function Contract() {
   const appCtx = React.useContext(AppContext);
 
-  const { authenticate, isAuthenticated, user, enableWeb3, logout, Moralis, web3 } = useMoralis();
-  const { data, error, runContractFunction, isFetching, isLoading } = useWeb3Contract({});
-
   const [bg, setBG] = React.useState<string>("");
   const [res, setRes] = React.useState<result>();
   const [showBGimage, setShowBGimage] = React.useState<boolean>(false);
-
-  const init = async () => {
-    await enableWeb3();
-  };
-
-  React.useEffect(() => {
-    init();
-  }, []);
+  const [isFetching, setIsFetching] = React.useState<boolean>(false);
+  const isAuthenticated = true;
 
   const formik = useFormik<any>({
     initialValues: {
-      symbol: "TLK",
+      name: "",
+      symbol: "",
       coverURL: "https://i.imgur.com/tvTq6UB.gif",
+      title: "",
+      content: "",
     },
     onSubmit: async (values: any) => {
-      setRes(undefined);
+      try {
+        if (appCtx.contract && appCtx.signer) {
+          setRes(undefined);
 
-      runContractFunction({
-        params: {
-          abi: appCtx.contractABI,
-          contractAddress: import.meta.env.VITE_CONTRACT_ADDRESS,
-          functionName: "newWebsite",
-          params: { ...values },
-        },
-        onSuccess: async (tx: any) => {
+          setIsFetching(true);
+          const tx = await appCtx.contract
+            .connect(appCtx.signer)
+            .newWebsite(values.name, values.symbol, values.coverURL, values.title, values.content);
           const response = await tx.wait();
+          setIsFetching(false);
 
           const { events } = response;
           events.map((event: any) => {
@@ -71,11 +66,11 @@ export default function Contract() {
               });
             }
           });
-        },
-        onError: async (err: any) => {
-          console.log(err.message);
-        },
-      });
+        }
+      } catch (error: any) {
+        setIsFetching(false);
+        console.log(error.message);
+      }
     },
   });
 
@@ -86,7 +81,7 @@ export default function Contract() {
   return (
     <>
       <form onSubmit={formik.handleSubmit}>
-        <div className="flex justify-between absolute top-0 left-0 right-0 space-x-4">
+        <div className="absolute top-0 left-0 right-0 flex justify-between space-x-4">
           <Text fontSize="2xl">Name: </Text>
           <Input
             width="125px"
@@ -113,19 +108,22 @@ export default function Contract() {
           </Button>
 
           <div className="flex-1" />
-          {isFetching ? (
-            <Spinner />
-          ) : (
-            <Button colorScheme="blue" type="submit">
-              Mint Website
-            </Button>
-          )}
-
-          {res && (
+          {appCtx.contract && (
             <>
-              <Text fontSize="2xl">
-                <Link href={`/Contract/${res?.tokenId}`}> Go to your website</Link>
-              </Text>
+              {isFetching ? (
+                <Spinner />
+              ) : (
+                <Button colorScheme="blue" type="submit">
+                  Mint Website
+                </Button>
+              )}
+              {res && (
+                <>
+                  <Text fontSize="2xl">
+                    <Link href={`/Contract/${res?.tokenId}`}> Go to your website</Link>
+                  </Text>
+                </>
+              )}
             </>
           )}
         </div>
@@ -154,8 +152,8 @@ export default function Contract() {
               <Box margin="0 15px">Team</Box>
               <Spacer />
 
-              {isAuthenticated ? (
-                <Box margin="0 15px"> Connected</Box>
+              {appCtx.contract ? (
+                <Box margin="0 15px">Connected</Box>
               ) : (
                 <Button
                   backgroundColor="#D6517D"
@@ -166,7 +164,9 @@ export default function Contract() {
                   fontFamily="inherit"
                   padding="15px"
                   margin="0 15px"
-                  onClick={() => {}}
+                  onClick={() => {
+                    appCtx.connect();
+                  }}
                 >
                   Connect
                 </Button>

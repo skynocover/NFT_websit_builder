@@ -1,28 +1,61 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-describe("Greeter", function () {
-  it("Should return the new greeting once it's changed", async function () {
+const nftName = "NFT Name";
+const symbol = "TLK";
+const coverURL = "http://localhost/image";
+const title = "The Title";
+const content = "An content";
+
+describe("MintSite", function () {
+  it("Should set right information", async function () {
+    const Site = await ethers.getContractFactory("NminSite");
+    const site = await Site.deploy();
+    await site.deployed();
+
+    const tx = await site.newWebsite(nftName, symbol, coverURL, title, content);
+    const newWebsite = await tx.wait();
+
+    const {
+      addr,
+      title: getTitle,
+      content: getContent,
+      coverURL: getCoverUrl,
+    } = await site.websites(0);
+
+    expect(getTitle).to.equal(title);
+    expect(content).to.equal(getContent);
+    expect(coverURL).to.equal(getCoverUrl);
+
+    const event = newWebsite.events?.filter((x) => x.event === "NewWebsite")[0];
+    const webSiteAddr = event?.args?.newAddress;
+
+    expect(webSiteAddr).to.equal(addr);
+  });
+  it("Should set right information", async function () {
     const [owner, addr1, addr2] = await ethers.getSigners();
 
     // eslint-disable-next-line node/no-unsupported-features/node-builtins
     console.table([owner.address, addr1.address, addr2.address]);
 
-    const Greeter = await ethers.getContractFactory("Greeter");
-    const greeter = await Greeter.deploy("Hello, world!");
-    // 加上connect 可以指定帳號
-    // const greeter = await Greeter.connect(addr1).deploy("Hello, world!");
-    await greeter.deployed();
+    const Site = await ethers.getContractFactory("NminSite");
+    const site = await Site.connect(owner).deploy();
+    await site.deployed();
 
-    expect(await greeter.greet()).to.equal("Hello, world!");
+    const tx = await site.newWebsite(nftName, symbol, coverURL, title, content);
+    const newWebsite = await tx.wait();
 
-    const setGreetingTx = await greeter
-      .connect(addr1)
-      .setGreeting("Hola, mundo!");
+    const event = newWebsite.events?.filter((x) => x.event === "NewWebsite")[0];
+    const webSiteAddr = event?.args?.newAddress;
 
-    // wait until the transaction is mined
-    await setGreetingTx.wait();
+    const newContract = await ethers.getContractAt("NFToken", webSiteAddr);
 
-    expect(await greeter.greet()).to.equal("Hola, mundo!");
+    expect(await newContract.owner()).to.equal(owner.address);
+
+    const tx2 = await newContract.connect(addr1).mint();
+    await tx2.wait();
+
+    expect(await newContract.balanceOf(addr1.address)).to.equal(1);
+    expect(await newContract.ownerOf(0)).to.equal(addr1.address);
   });
 });

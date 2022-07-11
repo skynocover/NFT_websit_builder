@@ -14,12 +14,14 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
 
-  await greeter.deployed();
+  const Site = await ethers.getContractFactory("NminSite");
+  const site = await Site.deploy();
+  // 加上connect 可以指定帳號
+  // const greeter = await Greeter.connect(addr1).deploy("Hello, world!");
+  await site.deployed();
 
-  console.log("Greeter deployed to:", greeter.address);
+  console.log("Greeter deployed to:", site.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
